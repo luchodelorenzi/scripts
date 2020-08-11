@@ -9,19 +9,19 @@
    Aug 5, 2020
  #>
 
-#$vcenter="vcsa-01a.corp.local" 
+$vcenter="vcsa-01a.corp.local" 
 $nsxmanager = "nsxapp-01a.corp.local"
 
-#$vcpassword = ConvertTo-SecureString 'VMware1!' -AsPlainText -Force
-#$nsxpassword = ConvertTo-SecureString 'VMware1!VMware1!' -AsPlainText -Force
+$vcpassword = ConvertTo-SecureString 'VMware1!' -AsPlainText -Force
+$nsxpassword = ConvertTo-SecureString 'VMware1!VMware1!' -AsPlainText -Force
 $overlayTransportZone = "nsx-overlay-transportzone"
-#$vccredential = New-Object System.Management.Automation.PSCredential('administrator@vsphere.local', $vcpassword)
-#$nsxcredential = New-Object System.Management.Automation.PSCredential('admin', $nsxpassword)
+$vccredential = New-Object System.Management.Automation.PSCredential('administrator@vsphere.local', $vcpassword)
+$nsxcredential = New-Object System.Management.Automation.PSCredential('admin', $nsxpassword)
 
 
 
-$vcenter=Read-Host "Enter vCenter FQDN"
-$vccredential = Get-Credential -message "Enter vCenter Credentials"
+#$vcenter=Read-Host "Enter vCenter FQDN"
+#$vccredential = Get-Credential -message "Enter vCenter Credentials"
 #$nsxmanager=Read-Host "Enter NSX Manager FQDN"
 #$nsxcredential = Get-Credential -message "Enter NSX Credentials"
 #$overlayTransportZone = Read-Host "Enter NSX Overlay Transport Zone name"
@@ -35,26 +35,27 @@ foreach ($vm in $vms) {
     $networkObject.Portgroups = ($vm | Get-NetworkAdapter | Get-VDPortgroup).Name
 	$networkObject.Portgroups
     $networkObject.IP  = $vm.Guest.IPAddress
-	Write-Host $vm
+	#Write-Host $vm
 	if ($vm.extensiondata.guest.ipstack){
 		$device = ($vm.extensiondata.guest.ipstack[0].iprouteconfig.iproute | where {$_.network -eq "0.0.0.0"}).gateway.device 
 		
 		$networkObject.gateway = ($vm.extensiondata.guest.ipstack[0].iprouteconfig.iproute | 
 			where {$_.network -eq "0.0.0.0"}).gateway.ipaddress
-		$networkObject.gateway
+		#$networkObject.gateway
 		$networkObject.Prefix = ($vm.extensiondata.guest.ipstack[0].iprouteconfig.iproute | 
 			where {$_.network.length -gt 6} | where {$_.network -like "*.*"} | 
 				where {$_.prefixlength -ne 32} | where {$_.network.substring(0,4) -ne "224."}  | 
 					where {$_.prefixlength -ne 0} | where {$_.network.substring(0,8) -ne "169.254."} | 
 						where {$_.gateway.device -eq $device}).prefixlength
-		$networkObject.Prefix
+		#$networkObject.Prefix
 						
 		 foreach ($pg in $networkObject.Portgroups)
 		{
-			$PGObject = "" | Select Name, VLAN, Gateway
+			$PGObject = "" | Select Name, VLAN, Gateway, PrefixLength
 			$PGObject.Name = $pg
 			$PGObject.VLAN = (Get-VDPortgroup $pg).VlanConfiguration.VlanId
-			$PGObject.Gateway = $networkObject.Gateway + "/" + $networkObject.Prefix
+			$PGObject.Gateway = $networkObject.Gateway
+			$PGObject.PrefixLength = $networkObject.Prefix
 			#Skip Trunk vLAN
 			if ((Get-VDPortgroup $pg).VlanConfiguration.vlantype -ne 'Trunk'){
 				$PossibleSegments += $PGObject
@@ -67,7 +68,7 @@ $UniqueSegments = $PossibleSegments | Where {$_.Gateway -ne $null} | sort-object
 Write-Host "############################################################"
 Write-Host "Found the following possible segments in your infrastructure"
 $uniqueSegments | % {
-	Write-Host Portgroup $_.name with VLAN $_.VLAN and gateway $_.gateway
+	Write-Host Portgroup $_.name with VLAN $_.VLAN, gateway $_.gateway and prefix length $_.prefixlength
 }
 
 Write-host "Would you like to Create these segments on NSX-T?" -ForegroundColor Yellow 
@@ -91,12 +92,12 @@ if ($createsegments){
 }
 	foreach ($segment in $uniqueSegments)
 	{
-		$segmentDisplayName = $segment.name + "-VLAN" + $segment.VLAN + "-GW" + $segment.gateway
+		$segmentDisplayName = $segment.name + "-VLAN" + $segment.VLAN + "-GW-" + $segment.gateway
 		$Body = @{
 			display_name = $segmentDisplayName
 			subnets = @(
 					@{
-					gateway_address = $segment.gateway
+					gateway_address = $segment.gateway + "/" + $segment.prefixlength
 					}
 				)
 			transport_zone_path="/infra/sites/default/enforcement-points/default/transport-zones/$overlayTzId"
