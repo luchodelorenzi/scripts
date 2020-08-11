@@ -33,14 +33,14 @@ foreach ($vm in $vms) {
 					where {$_.prefixlength -ne 0} | where {$_.network.substring(0,8) -ne "169.254."} | 
 						where {$_.gateway.device -eq $device}).prefixlength
 						
-		$pg=$networkObject.portgroups[$device]
+		$pg=($vm | Get-NetworkAdapter)[$device]) | Get-VDPortgroup
 		$PGObject = "" | Select Name, VLAN, Gateway, PrefixLength
 		$PGObject.Name = $pg.name
 		$PGObject.VLAN = $pg.VlanConfiguration.VlanId
 		$PGObject.Gateway = $networkObject.Gateway
 		$PGObject.PrefixLength = $networkObject.Prefix
 		#Skip Trunk vLAN
-		if ($pg.VlanConfiguration.vlantype -ne 'Trunk'){
+		if ($pg.VlanConfiguration.vlantype -ne 'Trunk' -and $pg.name -notlike "*vxw-dvs*"){
 			$PossibleSegments += $PGObject
 		 }
 	}
