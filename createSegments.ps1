@@ -17,7 +17,7 @@ $overlayTransportZone = Read-Host "Enter NSX Overlay Transport Zone name"
 Connect-VIServer -Server $vcenter -credential $vccredential
 
 $PossibleSegments = @()
-$vms = Get-VM | Select -first 100
+$vms = Get-VM 
 
 foreach ($vm in $vms) {
     $networkObject = "" | Select Portgroups,Gateway,Prefix
