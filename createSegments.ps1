@@ -17,12 +17,12 @@ $overlayTransportZone = Read-Host "Enter NSX Overlay Transport Zone name"
 Connect-VIServer -Server $vcenter -credential $vccredential
 
 $PossibleSegments = @()
-$vms = Get-VM 
+$vms = Get-VM | Select -first 100
 
 foreach ($vm in $vms) {
     $networkObject = "" | Select Portgroups,Gateway,Prefix
     $networkObject.Portgroups = ($vm | Get-NetworkAdapter | Get-VDPortgroup)
-	Write-Host Querying data for $vm...
+    Write-Host Querying data for $vm...
 	if ($vm.extensiondata.guest.ipstack){
 		$device = ($vm.extensiondata.guest.ipstack[0].iprouteconfig.iproute | where {$_.network -eq "0.0.0.0"}).gateway.device 
 		$networkObject.gateway = ($vm.extensiondata.guest.ipstack[0].iprouteconfig.iproute | 
@@ -33,14 +33,16 @@ foreach ($vm in $vms) {
 					where {$_.prefixlength -ne 0} | where {$_.network.substring(0,8) -ne "169.254."} | 
 						where {$_.gateway.device -eq $device}).prefixlength
 						
-		$pg=($vm | Get-NetworkAdapter)[$device]) | Get-VDPortgroup
+		if (($vm | Get-NetworkAdapter)[$device]){
+			$pg = ($vm | Get-NetworkAdapter)[$device] | get-vdportgroup
+		}
 		$PGObject = "" | Select Name, VLAN, Gateway, PrefixLength
 		$PGObject.Name = $pg.name
 		$PGObject.VLAN = $pg.VlanConfiguration.VlanId
 		$PGObject.Gateway = $networkObject.Gateway
 		$PGObject.PrefixLength = $networkObject.Prefix
 		#Skip Trunk vLAN
-		if ($pg.VlanConfiguration.vlantype -ne 'Trunk' -and $pg.name -notlike "*vxw-dvs*"){
+		if ($pg.VlanConfiguration.vlantype -ne 'Trunk' -and $pg.name -notlike "*vxw-dvs*" -and $pg.name -ne $null){
 			$PossibleSegments += $PGObject
 		 }
 	}
@@ -90,10 +92,3 @@ if ($createsegments){
 	}
 }
 Disconnect-VIServer -confirm:$false
-
-
-
-
-
-
-
