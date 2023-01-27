@@ -4,7 +4,7 @@ Author: @ldelorenzi - Jan 23
 
 
 Usage:
-moveT1s.ps1 -nsxUrl <NSX Manager URL (with HTTPS)) -sourceClusterName <Edge Cluster Name> -destinationClusterName <Edge Cluster Name> -execute <$true/$false> -count <count of load balancers to move>
+moveT1s.ps1 -nsxUrl <NSX Manager URL (with HTTPS)) -sourceClusterName <Edge Cluster Name> -destinationClusterName <Edge Cluster Name> -execute <$true/$false> -count <count of T1 Gateways to move>
 Credentials will be asked at the beginning
 ################################################>
 [CmdletBinding()]
